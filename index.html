@@ -2,69 +2,124 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Socials overlay</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-  /* ===== EDIT THESE ===== */
-  :root {
-    --kick: #53fc18;       /* Kick green */
-    --bg: #0b0e0f;        /* pill background */
-    --text: #ffffff;
-    --margin-left: 32px;   /* distance from left edge of the camera */
-    --margin-bottom: 32px; /* distance from bottom edge of the camera */
-  }
-  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+<title>Socials overlay - TikTok optimized</title>
 
-  /* Slide in/out: transform + opacity only, own GPU layer */
+<style>
+  :root {
+    --kick: #53fc18;
+    --bg: #0b0e0f;
+    --text: #ffffff;
+    --margin-left: 32px;
+    --margin-bottom: 32px;
+  }
+
+  html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    background: transparent;
+    overflow: hidden;
+  }
+
+  /*
+    PERFORMANCE NOTES
+    - Animated properties are only transform + opacity.
+    - No animated box-shadow/filter/blur.
+    - No layout properties are animated.
+    - The glow is a lightweight opacity-only overlay.
+  */
+
   .wrap {
     position: fixed;
     left: var(--margin-left);
     bottom: var(--margin-bottom);
-    transform-origin: left bottom;
-    transform: translateX(calc(-100% - var(--margin-left) - 40px));
+
+    transform: translate3d(calc(-100% - var(--margin-left) - 40px), 0, 0);
     opacity: 0;
+
+    /* Keep one composited layer for the moving element. */
     will-change: transform, opacity;
+
+    /* CSS zoom is cheaper here than animating layout dimensions. */
+    zoom: 1;
   }
-  .wrap.in  { animation: slide-in  .7s cubic-bezier(.2,.9,.25,1) forwards; }
-  .wrap.out { animation: slide-out .55s cubic-bezier(.6,0,.8,.3) forwards; }
+
+  .wrap.in {
+    animation: slide-in 700ms cubic-bezier(.2,.9,.25,1) both;
+  }
+
+  .wrap.out {
+    animation: slide-out 550ms cubic-bezier(.6,0,.8,.3) both;
+  }
 
   @keyframes slide-in {
-    from { transform: translateX(calc(-100% - var(--margin-left) - 40px)); opacity: 0; }
-    to   { transform: translateX(0); opacity: 1; }
-  }
-  @keyframes slide-out {
-    from { transform: translateX(0); opacity: 1; }
-    to   { transform: translateX(calc(-100% - var(--margin-left) - 40px)); opacity: 0; }
+    from {
+      transform: translate3d(calc(-100% - var(--margin-left) - 40px), 0, 0);
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
   }
 
-  /* Stage = pill + glow. Only the stage's scale and the glow's opacity are animated,
-     so nothing gets repainted during the pulse (old version animated box-shadow). */
+  @keyframes slide-out {
+    from {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+    to {
+      transform: translate3d(calc(-100% - var(--margin-left) - 40px), 0, 0);
+      opacity: 0;
+    }
+  }
+
   .stage {
     position: relative;
     transform-origin: left center;
     will-change: transform;
-    --o: 0px; --c1: rgba(255,255,255,.5); --c2: rgba(255,255,255,.5); --c3: rgba(255,255,255,.5);
-  }
-  .stage.pulse { animation: pulse .6s ease-in-out; }
-  @keyframes pulse {
-    0%   { transform: scale(1); }
-    45%  { transform: scale(1.09); }
-    100% { transform: scale(1); }
+
+    /*
+      Lightweight pulse:
+      no box-shadow animation.
+      The ring is already rendered and only its opacity changes.
+    */
+    --pulse: rgba(255,255,255,.55);
   }
 
+  .stage.pulse {
+    animation: pulse 600ms ease-in-out both;
+  }
+
+  @keyframes pulse {
+    0%   { transform: scale3d(1,1,1); }
+    45%  { transform: scale3d(1.06,1.06,1); }
+    100% { transform: scale3d(1,1,1); }
+  }
+
+  /*
+    Instead of animated blurred box-shadow, use a simple translucent
+    outline. It gives a pulse without triggering expensive blur repaints.
+  */
   .glow {
     position: absolute;
-    inset: 0;
-    border-radius: 10px;
+    inset: -2px;
+    border: 2px solid var(--pulse);
+    border-radius: 12px;
     opacity: 0;
     pointer-events: none;
-    box-shadow: calc(var(--o) * -1) 0 28px var(--c1), 0 0 30px var(--c2), var(--o) 0 28px var(--c3);
+    box-sizing: border-box;
     will-change: opacity;
   }
-  .stage.pulse .glow { animation: glow .6s ease-in-out; }
+
+  .stage.pulse .glow {
+    animation: glow 600ms ease-in-out both;
+  }
+
   @keyframes glow {
     0%   { opacity: 0; }
-    45%  { opacity: 1; }
+    45%  { opacity: .9; }
     100% { opacity: 0; }
   }
 
@@ -73,22 +128,44 @@
     display: flex;
     align-items: stretch;
     height: 52px;
+
     background: var(--bg);
     border-radius: 10px;
     overflow: hidden;
-    box-shadow: 0 6px 20px rgba(0,0,0,.45);
+
+    /*
+      One small static shadow only.
+      It is never animated.
+    */
+    box-shadow: 0 4px 12px rgba(0,0,0,.35);
+
     font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    contain: layout paint;
   }
 
-  /* pulse colour per icon: --c1..--c3 are glow colours, --o spreads them left/right (fade) */
-  .stage[data-icon="kick"] { --c1: rgba(83,252,24,.6);  --c2: rgba(83,252,24,.6);  --c3: rgba(83,252,24,.6); }
-  .stage[data-icon="yt"]   { --c1: rgba(255,0,0,.6);    --c2: rgba(255,0,0,.6);    --c3: rgba(255,0,0,.6); }
-  .stage[data-icon="tt"]   { --c1: rgba(255,255,255,.55); --c2: rgba(255,255,255,.55); --c3: rgba(255,255,255,.55); }
-  .stage[data-icon="ig"]   { --o: 12px; --c1: rgba(250,126,30,.65); --c2: rgba(214,41,118,.65); --c3: rgba(79,91,213,.65); }
+  .stage[data-icon="kick"] { --pulse: rgba(83,252,24,.8); }
+  .stage[data-icon="yt"]   { --pulse: rgba(255,0,0,.8); }
+  .stage[data-icon="tt"]   { --pulse: rgba(255,255,255,.75); }
+  .stage[data-icon="ig"]   { --pulse: rgba(214,41,118,.8); }
 
-  .mark { width: 52px; display: grid; place-items: center; }
-  .mark svg { display: none; height: 30px; width: auto; }
-  .mark svg.kick { fill: var(--kick); margin-left: 6px; }
+  .mark {
+    width: 52px;
+    min-width: 52px;
+    display: grid;
+    place-items: center;
+  }
+
+  .mark svg {
+    display: none;
+    height: 30px;
+    width: auto;
+  }
+
+  .mark svg.kick {
+    fill: var(--kick);
+    margin-left: 6px;
+  }
+
   .stage[data-icon="kick"] .mark svg.kick { display: block; }
   .stage[data-icon="ig"]   .mark svg.ig   { display: block; }
   .stage[data-icon="yt"]   .mark svg.yt   { display: block; height: 32px; }
@@ -98,6 +175,7 @@
     display: flex;
     align-items: center;
     padding: 0 22px 0 16px;
+
     color: var(--text);
     font-size: 24px;
     font-weight: 700;
@@ -105,116 +183,282 @@
     white-space: nowrap;
   }
 
+  /*
+    The overlay can be scaled through the URL:
+    ?scale=1.2
+  */
+  .wrap.scaled {
+    transform: translate3d(calc(-100% - var(--margin-left) - 40px), 0, 0)
+               scale(var(--scale));
+    transform-origin: left bottom;
+  }
+
+  .wrap.scaled.in {
+    animation-name: slide-in-scaled;
+  }
+
+  .wrap.scaled.out {
+    animation-name: slide-out-scaled;
+  }
+
+  @keyframes slide-in-scaled {
+    from {
+      transform: translate3d(calc(-100% - var(--margin-left) - 40px), 0, 0)
+                 scale(var(--scale));
+      opacity: 0;
+    }
+    to {
+      transform: translate3d(0, 0, 0) scale(var(--scale));
+      opacity: 1;
+    }
+  }
+
+  @keyframes slide-out-scaled {
+    from {
+      transform: translate3d(0, 0, 0) scale(var(--scale));
+      opacity: 1;
+    }
+    to {
+      transform: translate3d(calc(-100% - var(--margin-left) - 40px), 0, 0)
+                 scale(var(--scale));
+      opacity: 0;
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    .wrap.in, .wrap.out, .stage.pulse, .stage.pulse .glow { animation-duration: .01s; }
+    .wrap.in,
+    .wrap.out,
+    .stage.pulse,
+    .stage.pulse .glow {
+      animation-duration: 1ms;
+    }
   }
 </style>
 </head>
+
 <body>
-  <div class="wrap" id="wrap">
-    <div class="stage" id="stage" data-icon="kick">
-      <div class="glow"></div>
-      <div class="pill">
-        <div class="mark">
-          <!-- Kick -->
-          <svg class="kick" viewBox="93 72 326 368" xmlns="http://www.w3.org/2000/svg" aria-label="Kick">
-            <polygon points="93,72 215,72 215,154 256,154 256,113 297,113 297,72 419,72 419,195 379,195 379,236 338,236 338,277 379,277 379,318 419,318 419,440 297,440 297,399 256,399 256,358 215,358 215,440 93,440"/>
-          </svg>
-          <!-- Instagram -->
-          <svg class="ig" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="Instagram">
-            <defs>
-              <linearGradient id="igg" x1="0" y1="1" x2="1" y2="0">
-                <stop offset="0" stop-color="#feda75"/>
-                <stop offset=".3" stop-color="#fa7e1e"/>
-                <stop offset=".55" stop-color="#d62976"/>
-                <stop offset=".8" stop-color="#962fbf"/>
-                <stop offset="1" stop-color="#4f5bd5"/>
-              </linearGradient>
-            </defs>
-            <rect x="2.5" y="2.5" width="19" height="19" rx="5.5" fill="none" stroke="url(#igg)" stroke-width="2.2"/>
-            <circle cx="12" cy="12" r="4.3" fill="none" stroke="url(#igg)" stroke-width="2.2"/>
-            <circle cx="17.5" cy="6.5" r="1.3" fill="url(#igg)"/>
-          </svg>
-          <!-- YouTube -->
-          <svg class="yt" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="YouTube">
-            <rect x="1" y="4.5" width="22" height="15" rx="4.5" fill="#ff0000"/>
-            <polygon points="9.8,8.8 15.8,12 9.8,15.2" fill="#ffffff"/>
-          </svg>
-          <!-- TikTok -->
-          <svg class="tt" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-label="TikTok">
-            <defs>
-              <path id="ttn" d="M12.5.02h3.9c.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93v8.75c-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72v4.44c-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36z"/>
-            </defs>
-            <use href="#ttn" fill="#25f4ee" transform="translate(-.9 -.7)"/>
-            <use href="#ttn" fill="#fe2c55" transform="translate(.9 .7)"/>
-            <use href="#ttn" fill="#ffffff"/>
-          </svg>
-        </div>
-        <div class="name" id="name"></div>
+
+<div class="wrap" id="wrap">
+  <div class="stage" id="stage" data-icon="kick">
+
+    <div class="glow"></div>
+
+    <div class="pill">
+      <div class="mark">
+
+        <!-- Kick -->
+        <svg class="kick" viewBox="93 72 326 368"
+             xmlns="http://www.w3.org/2000/svg"
+             aria-label="Kick">
+          <polygon points="93,72 215,72 215,154 256,154 256,113 297,113 297,72 419,72 419,195 379,195 379,236 338,236 338,277 379,277 379,318 419,318 419,440 297,440 297,399 256,399 256,358 215,358 215,440 93,440"/>
+        </svg>
+
+        <!-- Instagram -->
+        <svg class="ig" viewBox="0 0 24 24"
+             xmlns="http://www.w3.org/2000/svg"
+             aria-label="Instagram">
+          <defs>
+            <linearGradient id="igg" x1="0" y1="1" x2="1" y2="0">
+              <stop offset="0" stop-color="#feda75"/>
+              <stop offset=".3" stop-color="#fa7e1e"/>
+              <stop offset=".55" stop-color="#d62976"/>
+              <stop offset=".8" stop-color="#962fbf"/>
+              <stop offset="1" stop-color="#4f5bd5"/>
+            </linearGradient>
+          </defs>
+          <rect x="2.5" y="2.5" width="19" height="19"
+                rx="5.5" fill="none"
+                stroke="url(#igg)" stroke-width="2.2"/>
+          <circle cx="12" cy="12" r="4.3"
+                  fill="none"
+                  stroke="url(#igg)" stroke-width="2.2"/>
+          <circle cx="17.5" cy="6.5" r="1.3"
+                  fill="url(#igg)"/>
+        </svg>
+
+        <!-- YouTube -->
+        <svg class="yt" viewBox="0 0 24 24"
+             xmlns="http://www.w3.org/2000/svg"
+             aria-label="YouTube">
+          <rect x="1" y="4.5" width="22" height="15"
+                rx="4.5" fill="#ff0000"/>
+          <polygon points="9.8,8.8 15.8,12 9.8,15.2"
+                   fill="#ffffff"/>
+        </svg>
+
+        <!-- TikTok -->
+        <svg class="tt" viewBox="0 0 24 24"
+             xmlns="http://www.w3.org/2000/svg"
+             aria-label="TikTok">
+          <path d="M12.5.02h3.9c.08 1.53.63 3.09 1.75 4.17
+                   1.12 1.11 2.7 1.62 4.24 1.79v4.03
+                   c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93
+                   v8.75c-.08 1.4-.54 2.79-1.35 3.94
+                   -1.31 1.92-3.58 3.17-5.91 3.21
+                   -1.43.08-2.86-.31-4.08-1.03
+                   -2.02-1.19-3.44-3.37-3.65-5.71
+                   -.02-.5-.03-1-.01-1.49
+                   .18-1.9 1.12-3.72 2.58-4.96
+                   1.66-1.44 3.98-2.13 6.15-1.72v4.44
+                   c-.99-.32-2.15-.23-3.02.37
+                   -.63.41-1.11 1.04-1.36 1.75
+                   -.21.51-.15 1.07-.14 1.61
+                   .24 1.64 1.82 3.02 3.5 2.87
+                   1.12-.01 2.19-.66 2.77-1.61
+                   .19-.33.4-.67.41-1.06
+                   .1-1.79.06-3.57.07-5.36z"
+                fill="#25f4ee"
+                transform="translate(-.9 -.7)"/>
+          <path d="M12.5.02h3.9c.08 1.53.63 3.09 1.75 4.17
+                   1.12 1.11 2.7 1.62 4.24 1.79v4.03
+                   c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93
+                   v8.75c-.08 1.4-.54 2.79-1.35 3.94
+                   -1.31 1.92-3.58 3.17-5.91 3.21
+                   -1.43.08-2.86-.31-4.08-1.03
+                   -2.02-1.19-3.44-3.37-3.65-5.71
+                   -.02-.5-.03-1-.01-1.49
+                   .18-1.9 1.12-3.72 2.58-4.96
+                   1.66-1.44 3.98-2.13 6.15-1.72v4.44
+                   c-.99-.32-2.15-.23-3.02.37
+                   -.63.41-1.11 1.04-1.36 1.75
+                   -.21.51-.15 1.07-.14 1.61
+                   .24 1.64 1.82 3.02 3.5 2.87
+                   1.12-.01 2.19-.66 2.77-1.61
+                   .19-.33.4-.67.41-1.06
+                   .1-1.79.06-3.57.07-5.36z"
+                fill="#fe2c55"
+                transform="translate(.9 .7)"/>
+          <path d="M12.5.02h3.9c.08 1.53.63 3.09 1.75 4.17
+                   1.12 1.11 2.7 1.62 4.24 1.79v4.03
+                   c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93
+                   v8.75c-.08 1.4-.54 2.79-1.35 3.94
+                   -1.31 1.92-3.58 3.17-5.91 3.21
+                   -1.43.08-2.86-.31-4.08-1.03
+                   -2.02-1.19-3.44-3.37-3.65-5.71
+                   -.02-.5-.03-1-.01-1.49
+                   .18-1.9 1.12-3.72 2.58-4.96
+                   1.66-1.44 3.98-2.13 6.15-1.72v4.44
+                   c-.99-.32-2.15-.23-3.02.37
+                   -.63.41-1.11 1.04-1.36 1.75
+                   -.21.51-.15 1.07-.14 1.61
+                   .24 1.64 1.82 3.02 3.5 2.87
+                   1.12-.01 2.19-.66 2.77-1.61
+                   .19-.33.4-.67.41-1.06
+                   .1-1.79.06-3.57.07-5.36z"
+                fill="#ffffff"/>
+        </svg>
+
       </div>
+
+      <div class="name" id="name"></div>
     </div>
   </div>
+</div>
 
 <script>
-  // ===== DEFAULTS (URL params override these) =====
-  // Example: ?kick=kick.com/nick&ig=@nick&hold=2&gap=0&scale=1.2
+  /*
+    DEFAULTS
+    URL parameters still work:
+    ?kick=kick.com/nick&ig=@nick&hold=2&gap=0&scale=1.2
+  */
+
   const CONFIG = {
     kick: "kick.com/lotnikv2",
     ig:   "@lotnikv2",
     yt:   "@lotnikkv2",
     tt:   "@lotnikv2",
-    hold: 5.2,  // seconds to stay after the pulse, before hiding (~6.5 s on screen in total)
-    gap: 0,     // extra pause (seconds) between one item hiding and the next appearing
+    hold: 5.2,
+    gap: 0,
     scale: 1
   };
 
-  const p = new URLSearchParams(location.search);
-  const num = (k, d) => parseFloat(p.get(k)) || d;
-  const hold = p.has("hold") ? parseFloat(p.get("hold")) : CONFIG.hold;
-  const gap  = p.has("gap")  ? parseFloat(p.get("gap"))  : CONFIG.gap;
-  const scale = num("scale", CONFIG.scale);
+  const params = new URLSearchParams(location.search);
 
-  // order of the rotation: Kick, Instagram, YouTube, TikTok, then back to Kick...
+  const getNumber = (key, fallback) => {
+    const value = parseFloat(params.get(key));
+    return Number.isFinite(value) ? value : fallback;
+  };
+
+  const hold  = getNumber("hold", CONFIG.hold);
+  const gap   = getNumber("gap", CONFIG.gap);
+  const scale = getNumber("scale", CONFIG.scale);
+
   const items = [
-    { icon: "kick", text: p.get("kick") || CONFIG.kick },
-    { icon: "ig",   text: p.get("ig")   || CONFIG.ig },
-    { icon: "yt",   text: p.get("yt")   || CONFIG.yt },
-    { icon: "tt",   text: p.get("tt")   || CONFIG.tt }
+    { icon: "kick", text: params.get("kick") || CONFIG.kick },
+    { icon: "ig",   text: params.get("ig")   || CONFIG.ig },
+    { icon: "yt",   text: params.get("yt")   || CONFIG.yt },
+    { icon: "tt",   text: params.get("tt")   || CONFIG.tt }
   ];
 
   const wrap = document.getElementById("wrap");
   const stage = document.getElementById("stage");
   const nameEl = document.getElementById("name");
-  wrap.style.scale = scale;
 
-  const SLIDE_IN = 700, PULSE = 600, SLIDE_OUT = 550; // ms, match the CSS
+  /*
+    Scale is part of the same transform as the slide animation.
+    This avoids a second transform property fighting with the animation.
+  */
+  wrap.classList.add("scaled");
+  wrap.style.setProperty("--scale", scale);
 
-  let i = 0;
+  const SLIDE_IN  = 700;
+  const PULSE     = 600;
+  const SLIDE_OUT = 550;
+
+  let index = 0;
+  let timer1 = 0;
+  let timer2 = 0;
+
+  function restartPulse() {
+    stage.classList.remove("pulse");
+
+    /*
+      Restart the CSS animation without forcing a full layout read.
+      requestAnimationFrame gives the browser a clean frame boundary.
+    */
+    requestAnimationFrame(() => {
+      stage.classList.add("pulse");
+    });
+  }
+
   function slideIn() {
-    const it = items[i];
-    stage.dataset.icon = it.icon;     // swapped while off-screen
-    nameEl.textContent = it.text;
+    const item = items[index];
+
+    stage.dataset.icon = item.icon;
+    nameEl.textContent = item.text;
+
     wrap.classList.remove("out");
     wrap.classList.add("in");
-    // pulse once right after sliding in
-    setTimeout(() => {
-      stage.classList.remove("pulse");
-      void stage.offsetWidth;         // restart animation
-      stage.classList.add("pulse");
+
+    timer1 = setTimeout(() => {
+      restartPulse();
     }, SLIDE_IN);
-    // then start hiding
-    setTimeout(slideOut, SLIDE_IN + PULSE + hold * 1000);
-  }
-  function slideOut() {
-    stage.classList.remove("pulse");
-    wrap.classList.remove("in");
-    wrap.classList.add("out");
-    i = (i + 1) % items.length;
-    // next one appears as soon as this one is gone
-    setTimeout(slideIn, SLIDE_OUT + gap * 1000);
+
+    timer2 = setTimeout(() => {
+      slideOut();
+    }, SLIDE_IN + PULSE + (hold * 1000));
   }
 
+  function slideOut() {
+    clearTimeout(timer1);
+    clearTimeout(timer2);
+
+    stage.classList.remove("pulse");
+
+    wrap.classList.remove("in");
+    wrap.classList.add("out");
+
+    index = (index + 1) % items.length;
+
+    setTimeout(slideIn, SLIDE_OUT + (gap * 1000));
+  }
+
+  /*
+    Start after a short delay so the browser finishes loading
+    before the first animation begins.
+  */
   setTimeout(slideIn, 800);
 </script>
+
 </body>
 </html>
